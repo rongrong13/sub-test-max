@@ -1,20 +1,20 @@
 <h1 align="center">🚀 订阅检测转换工具</h1>
 
 <p align="center">
-	<a href="https://github.com/beck-8/subs-check/releases"><img src="https://img.shields.io/github/v/release/beck-8/subs-check?style=flat-square&include_prereleases&label=version" /></a>
-	<a href="https://github.com/beck-8/subs-check/releases"><img src="https://img.shields.io/github/downloads/beck-8/subs-check/total.svg?style=flat-square" /></a>
+	<a href="https://github.com/rongrong13/sub-test-max/releases"><img src="https://img.shields.io/github/v/release/rongrong13/sub-test-max?style=flat-square&include_prereleases&label=version" /></a>
+	<a href="https://github.com/rongrong13/sub-test-max/releases"><img src="https://img.shields.io/github/downloads/rongrong13/sub-test-max/total.svg?style=flat-square" /></a>
   <a href="https://hub.docker.com/r/beck8/subs-check/tags"><img src="https://img.shields.io/docker/pulls/beck8/subs-check" /></a>
-	<a href="https://github.com/beck-8/subs-check/issues"><img src="https://img.shields.io/github/issues-raw/beck-8/subs-check.svg?style=flat-square&label=issues" /></a>
-	<a href="https://github.com/beck-8/subs-check/graphs/contributors"><img src="https://img.shields.io/github/contributors/beck-8/subs-check?style=flat-square" /></a>
-	<a href="https://github.com/beck-8/subs-check/blob/master/LICENSE"><img src="https://img.shields.io/github/license/beck-8/subs-check?style=flat-square" /></a>
+	<a href="https://github.com/rongrong13/sub-test-max/issues"><img src="https://img.shields.io/github/issues-raw/rongrong13/sub-test-max.svg?style=flat-square&label=issues" /></a>
+	<a href="https://github.com/rongrong13/sub-test-max/graphs/contributors"><img src="https://img.shields.io/github/contributors/rongrong13/sub-test-max?style=flat-square" /></a>
+	<a href="https://github.com/rongrong13/sub-test-max/blob/master/LICENSE"><img src="https://img.shields.io/github/license/rongrong13/sub-test-max?style=flat-square" /></a>
 </p>
 
 ---
 
 > **✨ 修复逻辑、简化操作、增加功能、节省内存、一键启动无需配置**
 
-> **⚠️ 注意：** 功能更新频繁，请查看最新的[配置文件](https://github.com/beck-8/subs-check/blob/master/config/config.example.yaml)以获取最新功能。  
-> **⚠️ 注意：** 如果想要查看功能更新，可以参照 [示例配置提交历史](https://github.com/beck-8/subs-check/commits/master/config/config.example.yaml),这里有变动说明有更功能/逻辑更新
+> **⚠️ 注意：** 功能更新频繁，请查看最新的[配置文件](https://github.com/rongrong13/sub-test-max/blob/master/config/config.example.yaml)以获取最新功能。  
+> **⚠️ 注意：** 如果想要查看功能更新，可以参照 [示例配置提交历史](https://github.com/rongrong13/sub-test-max/commits/master/config/config.example.yaml),这里有变动说明有更功能/逻辑更新
 
 > **🙏 鸣谢**：本项目的基座与核心功能来自原作者 [beck-8](https://github.com/beck-8) 的 [subs-check](https://github.com/beck-8/subs-check)（订阅检测转换工具）。在此深表感谢！
 
@@ -60,16 +60,16 @@
 
 ```bash
 # 默认安装
-bash <(curl -fsSL https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/rongrong13/sub-test-max/master/install.sh)
 
 # 使用 wget
-bash <(wget -qO- https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/rongrong13/sub-test-max/master/install.sh)
 
 # 如果无法访问 GitHub，可使用代理
-bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh) https://ghfast.top/
+bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/rongrong13/sub-test-max/master/install.sh) https://ghfast.top/
 
 # Alpine 等无 bash 环境
-wget -qO /tmp/install.sh https://raw.githubusercontent.com/beck-8/subs-check/master/install.sh && sh /tmp/install.sh && rm -f /tmp/install.sh
+wget -qO /tmp/install.sh https://raw.githubusercontent.com/rongrong13/sub-test-max/master/install.sh && sh /tmp/install.sh && rm -f /tmp/install.sh
 ```
 
 <details>
@@ -163,7 +163,7 @@ docker run -d \
   -v ./config:/app/config \
   -v ./output:/app/output \
   --restart always \
-  ghcr.io/beck-8/subs-check:latest
+  ghcr.io/rongrong13/sub-test-max:latest
 
 # 使用代理运行
 docker run -d \
@@ -175,7 +175,7 @@ docker run -d \
   -v ./config:/app/config \
   -v ./output:/app/output \
   --restart always \
-  ghcr.io/beck-8/subs-check:latest
+  ghcr.io/rongrong13/sub-test-max:latest
 ```
 
 ### 📜 Docker-Compose
@@ -184,7 +184,7 @@ docker run -d \
 version: "3"
 services:
   subs-check:
-    image: ghcr.io/beck-8/subs-check:latest
+    image: ghcr.io/rongrong13/sub-test-max:latest
     container_name: subs-check
     volumes:
       - ./config:/app/config
@@ -202,7 +202,7 @@ services:
 ```
 ### 📦 二进制文件运行
 
-下载 [Releases](https://github.com/beck-8/subs-check/releases) 中适合的版本，解压后直接运行即可。
+下载 [Releases](https://github.com/rongrong13/sub-test-max/releases) 中适合的版本，解压后直接运行即可。
 
 ### 🖥️ 源码运行
 
@@ -355,11 +355,11 @@ graph TD
 </details>
 
 ## 🙏 鸣谢
-[cmliu](https://github.com/cmliu)、[Sub-Store](https://github.com/sub-store-org/Sub-Store)、[bestruirui](https://github.com/bestruirui/BestSub)、[1password](https://1password.com/)、[ipinfo.io](https://ipinfo.io/)
+[beck-8](https://github.com/beck-8)（本项目的基座来自作者的 subs-check）、[cmliu](https://github.com/cmliu)、[Sub-Store](https://github.com/sub-store-org/Sub-Store)、[bestruirui](https://github.com/bestruirui/BestSub)、[1password](https://1password.com/)、[ipinfo.io](https://ipinfo.io/)
 
 ## ⭐ Star History
 
-[![Stargazers over time](https://starchart.cc/beck-8/subs-check.svg?variant=adaptive)](https://starchart.cc/beck-8/subs-check)
+[![Stargazers over time](https://starchart.cc/rongrong13/sub-test-max.svg?variant=adaptive)](https://starchart.cc/rongrong13/sub-test-max)
 
 ## ⚖️ 免责声明
 

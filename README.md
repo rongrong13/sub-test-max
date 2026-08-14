@@ -18,16 +18,6 @@
 
 > **🙏 鸣谢**：本项目的基座与核心功能来自原作者 [beck-8](https://github.com/beck-8) 的 [subs-check](https://github.com/beck-8/subs-check)（订阅检测转换工具）。在此深表感谢！
 
-## 📸 预览
-
-
-![preview](./doc/images/preview.png)  
-![result](./doc/images/results.png)  
-![admin](./doc/images/admin.png)
-| | |
-|---|---|
-| ![tgram](./doc/images/tgram.png) | ![dingtalk](./doc/images/dingtalk.png)  |
-
 ## ✨ 功能特性
 
 - **🔗 订阅合并**
@@ -55,52 +45,6 @@
 
 ## 🛠️ 部署与使用 
 > 首次运行会在当前目录生成默认配置文件。
-
-### 🚀 一键安装（Linux）
-
-```bash
-# 默认安装
-bash <(curl -fsSL https://raw.githubusercontent.com/rongrong13/sub-test-max/master/install.sh)
-
-# 使用 wget
-bash <(wget -qO- https://raw.githubusercontent.com/rongrong13/sub-test-max/master/install.sh)
-
-# 如果无法访问 GitHub，可使用代理
-bash <(curl -fsSL https://ghfast.top/https://raw.githubusercontent.com/rongrong13/sub-test-max/master/install.sh) https://ghfast.top/
-
-# Alpine 等无 bash 环境
-wget -qO /tmp/install.sh https://raw.githubusercontent.com/rongrong13/sub-test-max/master/install.sh && sh /tmp/install.sh && rm -f /tmp/install.sh
-```
-
-<details>
-  <summary>脚本说明</summary>
-
-安装脚本会自动执行以下操作：
-1. 检测系统架构（x86_64 / aarch64 / armv7 / i386）
-2. 从 GitHub Releases 下载最新版本
-3. 安装到 `/opt/subs-check` 目录
-4. 配置 systemd 服务
-5. 交互式选择是否开机自启动
-6. 交互式选择是否立即启动
-
-**服务管理：**
-```bash
-systemctl start subs-check    # 启动
-systemctl stop subs-check     # 停止
-systemctl restart subs-check  # 重启
-systemctl status subs-check   # 状态
-journalctl -u subs-check -f   # 日志
-```
-
-**卸载方法：**
-```bash
-systemctl stop subs-check
-systemctl disable subs-check
-rm -rf /opt/subs-check /etc/systemd/system/subs-check.service
-systemctl daemon-reload
-```
-
-</details>
 
 ### 🪜 代理设置（可选）
 <details>
@@ -148,43 +92,21 @@ speed-test-url: https://custom-domain/speedtest?bytes=1073741824
 
 </details>
 
-### 🐳 Docker 运行
+### 🐳 Docker Compose 运行
 
-> **⚠️ 注意：**  
-> - 限制内存请使用 `--memory="500m"`。  
-> - 可通过环境变量 `API_KEY` 设置 Web 控制面板的 API Key。
+> **⚠️ 注意：** 本项目暂未发布预构建镜像，请使用 Docker Compose **从源码构建**镜像后运行。
 
 ```bash
-# 基础运行
-docker run -d \
-  --name subs-check \
-  -p 8299:8299 \
-  -p 8199:8199 \
-  -v ./config:/app/config \
-  -v ./output:/app/output \
-  --restart always \
-  ghcr.io/rongrong13/sub-test-max:latest
-
-# 使用代理运行
-docker run -d \
-  --name subs-check \
-  -p 8299:8299 \
-  -p 8199:8199 \
-  -e HTTP_PROXY=http://192.168.1.1:7890 \
-  -e HTTPS_PROXY=http://192.168.1.1:7890 \
-  -v ./config:/app/config \
-  -v ./output:/app/output \
-  --restart always \
-  ghcr.io/rongrong13/sub-test-max:latest
+# 从当前目录的 Dockerfile 构建并启动
+docker compose up -d --build
 ```
-
-### 📜 Docker-Compose
 
 ```yaml
 version: "3"
 services:
   subs-check:
-    image: ghcr.io/rongrong13/sub-test-max:latest
+    build: .
+    image: subs-check:latest
     container_name: subs-check
     volumes:
       - ./config:/app/config

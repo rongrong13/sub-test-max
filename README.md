@@ -16,6 +16,8 @@
 > **⚠️ 注意：** 功能更新频繁，请查看最新的[配置文件](https://github.com/beck-8/subs-check/blob/master/config/config.example.yaml)以获取最新功能。  
 > **⚠️ 注意：** 如果想要查看功能更新，可以参照 [示例配置提交历史](https://github.com/beck-8/subs-check/commits/master/config/config.example.yaml),这里有变动说明有更功能/逻辑更新
 
+> **🙏 鸣谢**：本项目的基座与核心功能来自原作者 [beck-8](https://github.com/beck-8) 的 [subs-check](https://github.com/beck-8/subs-check)（订阅检测转换工具）。在此深表感谢！
+
 ## 📸 预览
 
 

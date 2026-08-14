@@ -1,4 +1,4 @@
-module github.com/beck-8/subs-check
+module github.com/rongrong13/sub-test-max
 
 go 1.25.0
 

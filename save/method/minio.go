@@ -8,7 +8,7 @@ import (
 	"mime"
 	"path/filepath"
 
-	"github.com/beck-8/subs-check/config"
+	"github.com/rongrong13/sub-test-max/config"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )

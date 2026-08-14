@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/beck-8/subs-check/check/unlock"
-	"github.com/beck-8/subs-check/config"
-	proxyutils "github.com/beck-8/subs-check/proxy"
+	"github.com/rongrong13/sub-test-max/check/unlock"
+	"github.com/rongrong13/sub-test-max/config"
+	proxyutils "github.com/rongrong13/sub-test-max/proxy"
 )
 
 // providerAbbr 服务名 → 节点名标注用的短缩写(未映射的服务使用原名前几个字符)。

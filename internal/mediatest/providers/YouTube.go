@@ -1,7 +1,7 @@
 package providers
 
 import (
-	"github.com/beck-8/subs-check/internal/mediatest/core"
+	"github.com/rongrong13/sub-test-max/internal/mediatest/core"
 	"bufio"
 	"io"
 	"strings"

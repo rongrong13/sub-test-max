@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/beck-8/subs-check/config"
+	"github.com/rongrong13/sub-test-max/config"
 	"github.com/mattn/go-isatty"
 )
 

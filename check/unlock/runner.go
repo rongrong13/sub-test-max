@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/beck-8/subs-check/internal/mediatest/core"
-	"github.com/beck-8/subs-check/internal/mediatest/providers"
+	"github.com/rongrong13/sub-test-max/internal/mediatest/core"
+	"github.com/rongrong13/sub-test-max/internal/mediatest/providers"
 	"github.com/metacubex/mihomo/constant"
 )
 

@@ -3,10 +3,10 @@ package check
 import (
 	"testing"
 
-	"github.com/beck-8/subs-check/check/iprisk"
-	"github.com/beck-8/subs-check/check/unlock"
-	"github.com/beck-8/subs-check/config"
-	proxyutils "github.com/beck-8/subs-check/proxy"
+	"github.com/rongrong13/sub-test-max/check/iprisk"
+	"github.com/rongrong13/sub-test-max/check/unlock"
+	"github.com/rongrong13/sub-test-max/config"
+	proxyutils "github.com/rongrong13/sub-test-max/proxy"
 )
 
 // withConfig 临时替换 config.GlobalConfig 的内容,测试结束后还原。

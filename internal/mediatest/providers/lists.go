@@ -1,7 +1,7 @@
 package providers
 
 import (
-	core "github.com/beck-8/subs-check/internal/mediatest/core"
+	core "github.com/rongrong13/sub-test-max/internal/mediatest/core"
 )
 
 type TestItem struct {

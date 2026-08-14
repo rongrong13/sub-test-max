@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/beck-8/subs-check/app"
+	"github.com/rongrong13/sub-test-max/app"
 )
 
 func main() {

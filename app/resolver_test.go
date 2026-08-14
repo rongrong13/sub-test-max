@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/beck-8/subs-check/config"
+	"github.com/rongrong13/sub-test-max/config"
 	"github.com/metacubex/mihomo/component/resolver"
 )
 

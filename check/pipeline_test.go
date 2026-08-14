@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/beck-8/subs-check/config"
+	"github.com/rongrong13/sub-test-max/config"
 )
 
 // makePipelineProxies returns n stub proxies; the numeric index is

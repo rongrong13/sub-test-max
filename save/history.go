@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/beck-8/subs-check/config"
-	"github.com/beck-8/subs-check/save/method"
+	"github.com/rongrong13/sub-test-max/config"
+	"github.com/rongrong13/sub-test-max/save/method"
 	"gopkg.in/yaml.v3"
 )
 

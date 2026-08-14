@@ -10,12 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/beck-8/subs-check/app/monitor"
-	"github.com/beck-8/subs-check/assets"
-	"github.com/beck-8/subs-check/check"
-	"github.com/beck-8/subs-check/config"
-	"github.com/beck-8/subs-check/save"
-	"github.com/beck-8/subs-check/utils"
+	"github.com/rongrong13/sub-test-max/app/monitor"
+	"github.com/rongrong13/sub-test-max/assets"
+	"github.com/rongrong13/sub-test-max/check"
+	"github.com/rongrong13/sub-test-max/config"
+	"github.com/rongrong13/sub-test-max/save"
+	"github.com/rongrong13/sub-test-max/utils"
 	"github.com/fsnotify/fsnotify"
 	"github.com/robfig/cron/v3"
 )

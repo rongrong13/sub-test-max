@@ -3,8 +3,8 @@ package check
 import (
 	"testing"
 
-	"github.com/beck-8/subs-check/check/unlock"
-	"github.com/beck-8/subs-check/config"
+	"github.com/rongrong13/sub-test-max/check/unlock"
+	"github.com/rongrong13/sub-test-max/config"
 )
 
 func TestFilterResults_NoFilter_PassesAll(t *testing.T) {

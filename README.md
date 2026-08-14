@@ -41,6 +41,16 @@
 - **⏰ 支持 Crontab 表达式**
 - **🖥️ 多平台支持**
 
+## 🎬 流媒体与 IP 风险检测
+
+> 本项目内嵌整合了 **MediaUnlockTest**(https://github.com/HsukqiLee/MediaUnlockTest) 的检测逻辑作为流媒体解锁检测引擎;IP 风险检测改用 **ip-api.com** 的免费启发式方案(替代原先易被反爬拦截的 scamalytics)。
+
+- **流媒体解锁检测**:逐节点用 Chrome 指纹(tls_client)探测 Netflix / Disney+ / YouTube Premium / OpenAI ChatGPT / Anthropic Claude / Google Gemini / Spotify 等 100+ 服务,结果只把解锁成功的服务标注到节点名上(失败不显示)。
+- **IP 风险检测**:通过节点出口 IP 查询 ip-api.com(免费、无反爬),按 hosting / proxy / 云厂商 ASN / 移动 / 住宅等启发式规则打分(0-100%),并输出机房/住宅与代理/原生属性。
+- **节点命名格式**(同 IP-Stream-Checker):原名·风险%·GM✓(sg)·NF✓(us)·GPT✓【emoji 机房|代理】
+  例:🇭🇰 HK-01·61%·GM✓(sg)·NF✓(us)·GPT✓【🟠 机房|代理】
+- platforms 配置项沿用原有平台名即可(netflix/disney/openai/gemini/claude/spotify/youtube/tiktok/iprisk),也支持直接填写 MediaUnlockTest 服务名(如 Amazon Prime Video)以启用更多服务。
+
 ## 🛠️ 部署与使用 
 > 首次运行会在当前目录生成默认配置文件。
 

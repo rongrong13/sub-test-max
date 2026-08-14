@@ -15,7 +15,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/beck-8/subs-check/check/iprisk"
 	"github.com/beck-8/subs-check/check/platform"
+	"github.com/beck-8/subs-check/check/unlock"
 	"github.com/beck-8/subs-check/config"
 	proxyutils "github.com/beck-8/subs-check/proxy"
 	"github.com/juju/ratelimit"
@@ -25,21 +27,11 @@ import (
 
 // Result 存储节点检测结果
 type Result struct {
-	Proxy      map[string]any
-	Openai     *platform.OpenAIResult
-	Youtube    string
-	Netflix    *platform.NetflixResult
-	Google     bool
-	Cloudflare bool
-	Disney     *platform.DisneyResult
-	Gemini     string
-	TikTok     string
-	Claude     string
-	Spotify    string
-	IP         string
-	IPRisk     string
-	Country    string
-	Speed      int // KB/s, 0 表示未测速或测速未通过
+	Proxy   map[string]any
+	Media   []unlock.Result // MediaUnlockTest 各服务解锁结果(按 config.Platforms 顺序)
+	IPRisk  *iprisk.Result  // ip-api 启发式 IP 风险结果(含 IP/Country/RiskPct/Emoji/IPAttr/IPSource)
+	Country string          // 兜底国家(仅当 iprisk 缺失且需要重命名节点时使用)
+	Speed   int             // KB/s, 0 表示未测速或测速未通过
 }
 
 // aliveResult 存活检测通过的中间结果
@@ -595,88 +587,33 @@ func (pc *ProxyChecker) checkMedia(a aliveResult) *Result {
 			Timeout:   time.Duration(mediaTimeout) * time.Second,
 		}
 
-		// 并行检测所有平台
+		// 解析需要检测的服务与是否开启 IP 风险检测
+		providers, doIPRisk := resolveMediaProviders(config.GlobalConfig.Platforms)
+
+		nodeProxy, err := adapter.ParseProxy(a.Proxy)
+		if err != nil {
+			return res
+		}
+
+		// IP 风险检测 与 流媒体解锁检测互不依赖,并行执行
 		var mediaWg sync.WaitGroup
-		for _, plat := range config.GlobalConfig.Platforms {
-			switch plat {
-			case "openai":
-				mediaWg.Add(1)
-				go func() {
-					defer mediaWg.Done()
-					res.Openai = platform.CheckOpenAI(mediaClient)
-				}()
-			case "youtube":
-				mediaWg.Add(1)
-				go func() {
-					defer mediaWg.Done()
-					if region, _ := platform.CheckYoutube(mediaClient); region != "" {
-						res.Youtube = region
-					}
-				}()
-			case "netflix":
-				mediaWg.Add(1)
-				go func() {
-					defer mediaWg.Done()
-					nf, _ := platform.CheckNetflix(mediaClient)
-					res.Netflix = nf
-				}()
-			case "disney":
-				mediaWg.Add(1)
-				go func() {
-					defer mediaWg.Done()
-					d, _ := platform.CheckDisney(mediaClient)
-					res.Disney = d
-				}()
-			case "gemini":
-				mediaWg.Add(1)
-				go func() {
-					defer mediaWg.Done()
-					if region, _ := platform.CheckGemini(mediaClient); region != "" {
-						res.Gemini = region
-					}
-				}()
-			case "claude":
-				mediaWg.Add(1)
-				go func() {
-					defer mediaWg.Done()
-					if region, _ := platform.CheckClaude(mediaClient); region != "" {
-						res.Claude = region
-					}
-				}()
-			case "spotify":
-				mediaWg.Add(1)
-				go func() {
-					defer mediaWg.Done()
-					if region, _ := platform.CheckSpotify(mediaClient); region != "" {
-						res.Spotify = region
-					}
-				}()
-			case "iprisk":
-				mediaWg.Add(1)
-				go func() {
-					defer mediaWg.Done()
-					country, ip := proxyutils.GetProxyCountry(mediaClient)
-					if ip == "" {
-						return
-					}
-					res.IP = ip
-					res.Country = country
-					risk, err := platform.CheckIPRisk(mediaClient, ip)
-					if err == nil {
-						res.IPRisk = risk
-					} else {
-						slog.Debug(fmt.Sprintf("查询IP风险失败: %v", err))
-					}
-				}()
-			case "tiktok":
-				mediaWg.Add(1)
-				go func() {
-					defer mediaWg.Done()
-					if region, _ := platform.CheckTikTok(mediaClient); region != "" {
-						res.TikTok = region
-					}
-				}()
-			}
+		if doIPRisk {
+			mediaWg.Add(1)
+			go func() {
+				defer mediaWg.Done()
+				risk := iprisk.Check(mediaClient)
+				res.IPRisk = risk
+				if risk != nil && risk.Country != "" {
+					res.Country = risk.Country
+				}
+			}()
+		}
+		if len(providers) > 0 {
+			mediaWg.Add(1)
+			go func() {
+				defer mediaWg.Done()
+				res.Media = unlock.Run(nodeProxy, providers, config.GlobalConfig.MediaConcurrent, mediaTimeout)
+			}()
 		}
 		mediaWg.Wait()
 	}

@@ -4,9 +4,104 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/beck-8/subs-check/check/unlock"
 	"github.com/beck-8/subs-check/config"
 	proxyutils "github.com/beck-8/subs-check/proxy"
 )
+
+// providerAbbr 服务名 → 节点名标注用的短缩写(未映射的服务使用原名前几个字符)。
+// 与 IP-Stream-Checker 中 stream_tester/media_unlock.py 的 PROVIDER_ABBR 一致。
+var providerAbbr = map[string]string{
+	"Netflix":             "NF",
+	"Netflix CDN":         "NF-CDN",
+	"Disney+":            "D+",
+	"Youtube Premium":     "YT",
+	"Youtube CDN":         "YT-CDN",
+	"OpenAI ChatGPT":      "GPT",
+	"Anthropic Claude":    "Claude",
+	"Google Gemini":       "GM",
+	"Microsoft Copilot":   "Copilot",
+	"Spotify Registration": "Spotify",
+	"Amazon Prime Video":  "Prime",
+	"Hulu":                "Hulu",
+	"HBO Max":             "Max",
+	"TikTok":              "TikTok",
+	"Steam":               "Steam",
+	"Reddit":              "Reddit",
+	"Apple":               "Apple",
+	"Bing":                "Bing",
+	"Dazn":                "Dazn",
+}
+
+func abbrOf(provider string) string {
+	if v, ok := providerAbbr[provider]; ok {
+		return v
+	}
+	if len(provider) > 6 {
+		return provider[:6]
+	}
+	return provider
+}
+
+// statusSymbol 根据状态返回标注符号与地区后缀(仅 "ok" 与 "restricted" 带地区的完整标注)。
+func statusSymbol(r unlockResultLike) string {
+	return statusSymbolCore(r)
+}
+
+// unlockResultLike 便于测试注入的最小接口。
+type unlockResultLike interface {
+	GetName() string
+	GetStatusText() string
+	GetRegion() string
+}
+
+type wrappedUnlockResult struct{ name, statusText, region string }
+
+func (w wrappedUnlockResult) GetName() string        { return w.name }
+func (w wrappedUnlockResult) GetStatusText() string  { return w.statusText }
+func (w wrappedUnlockResult) GetRegion() string      { return w.region }
+
+func statusSymbolCore(r unlockResultLike) string {
+	status := r.GetStatusText()
+	region := r.GetRegion()
+	switch status {
+	case "ok":
+		if region != "" {
+			return fmt.Sprintf("✓(%s)", region)
+		}
+		return "✓"
+	case "restricted":
+		if region != "" {
+			return fmt.Sprintf("⚠(%s)", region)
+		}
+		return "⚠"
+	default:
+		return "✗"
+	}
+}
+
+// formatStreamSummary 把解锁检测结果压成节点名标注(只保留解锁成功的服务),与
+// IP-Stream-Checker 的 format_summary 一致:
+//   "GM✓(sg)·NF✓(us)·GPT✓" — 解锁失败(✗)的服务不显示。
+func formatStreamSummary(results []unlockResultLike) string {
+	parts := make([]string, 0, len(results))
+	for _, item := range results {
+		if item.GetStatusText() != "ok" {
+			continue
+		}
+		parts = append(parts, abbrOf(item.GetName())+statusSymbol(item))
+	}
+	return strings.Join(parts, "·")
+}
+
+// adapter 将 []unlock.Result 适配为 []unlockResultLike(纯函数,便于 render 复用)。
+func adaptResults(res []unlock.Result) []unlockResultLike {
+	out := make([]unlockResultLike, 0, len(res))
+	for _, r := range res {
+		out = append(out, wrappedUnlockResult{name: r.Name, statusText: r.StatusText, region: r.Region})
+	}
+	return out
+}
 
 // RenderName 根据 Result 的结构化字段构造展示名。
 //
@@ -15,14 +110,13 @@ import (
 //   - 不读写 proxy map 的 name 字段,不修改 Result
 //   - 仅依赖传入的 Result 和 config.GlobalConfig
 //
+// 采用了 IP-Stream-Checker 的命名格式:
+//   {base}[·速度][·风险%][·流媒体解锁摘要]{IP标注【emoji 属性|来源】}
+//   例: "🇭🇰 HK-01·61%·GM✓(sg)·NF✓(us)·GPT✓【🟢 住宅|原生】"
+//
 // includeSpeed 为 true 时追加速度标签,只在最终输出 all.yaml 时用。
-// filter 阶段应该传 false,因为此时尚未测速。
 func RenderName(r Result, includeSpeed bool) string {
 	// 1. base 名字
-	// RenameNode 是"强覆盖合约":只要开了就用 Rename(Country) 的结果覆盖原名,
-	// Country 为空时 Rename 会走 ❓Other_N 的兜底。
-	// 这样能确保上游订阅里已有的 |speed|media 尾缀不会透传进来再被叠加,
-	// 否则在 IP 查询失败(免费节点常见)的节点上会出现重复标签。
 	var base string
 	if config.GlobalConfig.RenameNode {
 		base = config.GlobalConfig.NodePrefix + proxyutils.Rename(r.Country)
@@ -32,96 +126,58 @@ func RenderName(r Result, includeSpeed bool) string {
 		}
 	}
 
-	// 2. 速度标签(仅 includeSpeed 且有速度时追加,放在媒体标签之前以保持与旧版相同的展示顺序)
-	var tags []string
+	// 2. 速度标签(仅 includeSpeed)
+	var speedTag string
 	if includeSpeed && config.GlobalConfig.SpeedTestUrl != "" && r.Speed > 0 {
-		tags = append(tags, formatSpeedTag(r.Speed))
+		speedTag = formatSpeedTag(r.Speed)
 	}
 
-	// 3. 按 config.Platforms 顺序收集媒体标签
-	for _, plat := range config.GlobalConfig.Platforms {
-		if tag := mediaTagFor(plat, &r); tag != "" {
-			tags = append(tags, tag)
-		}
+	// 3. 风险度百分比(仅当有 IP 风险结果且非失败)
+	var riskPct string
+	if r.IPRisk != nil && r.IPRisk.RiskPct != "" && r.IPRisk.RiskPct != "?" {
+		riskPct = r.IPRisk.RiskPct
 	}
 
-	// 4. sub_tag 追加到最后
+	// 4. 流媒体解锁摘要(只显示解锁成功的服务)
+	streamSummary := formatStreamSummary(adaptResults(r.Media))
+
+	// 5. IP 风险完整标注【emoji 机房|代理】
+	ipTag := ""
+	if r.IPRisk != nil {
+		ipTag = r.IPRisk.FullString()
+	}
+
+	// 6. sub_tag 追加到最后
+	var subTag string
 	if r.Proxy != nil {
 		if t, ok := r.Proxy["sub_tag"].(string); ok && t != "" {
-			tags = append(tags, t)
+			subTag = t
 		}
 	}
 
-	if len(tags) == 0 {
-		return base
+	// 用 · 连接主体部分(空项跳过)
+	parts := make([]string, 0, 4)
+	for _, p := range []string{base, speedTag, riskPct, streamSummary} {
+		if p != "" {
+			parts = append(parts, p)
+		}
 	}
-	return base + "|" + strings.Join(tags, "|")
-}
+	var out string
+	if len(parts) > 0 {
+		out = strings.Join(parts, "·")
+	}
 
-// mediaTagFor 返回单个平台的展示标签,未命中返回空字符串。
-// 新增平台时只需在这里加一个 case 和对应的 Result 字段。
-func mediaTagFor(plat string, r *Result) string {
-	switch plat {
-	case "openai":
-		if r.Openai != nil {
-			if r.Openai.Full {
-				if r.Openai.Region != "" {
-					return fmt.Sprintf("GPT⁺-%s", r.Openai.Region)
-				}
-				return "GPT⁺"
-			}
-			if r.Openai.Web {
-				if r.Openai.Region != "" {
-					return fmt.Sprintf("GPT-%s", r.Openai.Region)
-				}
-				return "GPT"
-			}
-		}
-	case "netflix":
-		if r.Netflix != nil {
-			if r.Netflix.Full {
-				if r.Netflix.Region != "" {
-					return fmt.Sprintf("NF-%s", r.Netflix.Region)
-				}
-				return "NF"
-			}
-			if r.Netflix.OriginalsOnly {
-				return "NF"
-			}
-		}
-	case "disney":
-		if r.Disney != nil && r.Disney.Unlocked {
-			if r.Disney.Region != "" {
-				return fmt.Sprintf("D+-%s", r.Disney.Region)
-			}
-			return "D+"
-		}
-	case "gemini":
-		if r.Gemini != "" {
-			return fmt.Sprintf("GM-%s", r.Gemini)
-		}
-	case "claude":
-		if r.Claude != "" {
-			return fmt.Sprintf("CL-%s", r.Claude)
-		}
-	case "spotify":
-		if r.Spotify != "" {
-			return fmt.Sprintf("SP-%s", r.Spotify)
-		}
-	case "iprisk":
-		if r.IPRisk != "" {
-			return r.IPRisk
-		}
-	case "youtube":
-		if r.Youtube != "" {
-			return fmt.Sprintf("YT-%s", r.Youtube)
-		}
-	case "tiktok":
-		if r.TikTok != "" {
-			return fmt.Sprintf("TK-%s", r.TikTok)
+	// IP 标注直接拼接在末尾(参考 IP-Stream-Checker 的做法)
+	out += ipTag
+
+	if subTag != "" {
+		if out != "" {
+			out += "·" + subTag
+		} else {
+			out = subTag
 		}
 	}
-	return ""
+	return out
 }
 
 // formatSpeedTag 把测速结果(KB/s)格式化为展示字符串。

@@ -3,19 +3,24 @@ package check
 import (
 	"testing"
 
-	"github.com/beck-8/subs-check/check/platform"
+	"github.com/beck-8/subs-check/check/iprisk"
+	"github.com/beck-8/subs-check/check/unlock"
 	"github.com/beck-8/subs-check/config"
 	proxyutils "github.com/beck-8/subs-check/proxy"
 )
 
 // withConfig 临时替换 config.GlobalConfig 的内容,测试结束后还原。
-// GlobalConfig 是 *Config 指针,这里通过指针解引用赋值,保证持有同一指针的代码照常工作。
 func withConfig(t *testing.T, cfg config.Config, fn func()) {
 	t.Helper()
 	old := *config.GlobalConfig
 	*config.GlobalConfig = cfg
 	defer func() { *config.GlobalConfig = old }()
 	fn()
+}
+
+// okResult 构造一个"解锁成功"的 mediatest 结果。
+func okResult(name, region string) unlock.Result {
+	return unlock.Result{Name: name, Status: 1, StatusText: "ok", Region: region, Ok: true}
 }
 
 func TestRenderName_RenameOff_NoTags(t *testing.T) {
@@ -57,13 +62,37 @@ func TestRenderName_RenameOff_WithMediaTags(t *testing.T) {
 		Platforms:  []string{"openai", "netflix", "disney"},
 	}, func() {
 		r := Result{
-			Proxy:   map[string]any{"name": "🇭🇰香港01"},
-			Openai:  &platform.OpenAIResult{Full: true, Region: "HK"},
-			Netflix: &platform.NetflixResult{Full: true, Region: "HK"},
-			Disney:  &platform.DisneyResult{Unlocked: true, Region: "HK"},
+			Proxy: map[string]any{"name": "🇭🇰香港01"},
+			Media: []unlock.Result{
+				okResult("OpenAI ChatGPT", "hk"),
+				okResult("Netflix", "hk"),
+				okResult("Disney+", "hk"),
+			},
 		}
 		got := RenderName(r, false)
-		want := "🇭🇰香港01|GPT⁺-HK|NF-HK|D+-HK"
+		want := "🇭🇰香港01·GPT✓(hk)·NF✓(hk)·D+✓(hk)"
+		if got != want {
+			t.Errorf("RenderName() = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestRenderName_OnlyOkServicesShown(t *testing.T) {
+	// 未解锁(status_text != ok)的服务不显示在节点名里
+	withConfig(t, config.Config{
+		RenameNode: false,
+		Platforms:  []string{"openai", "netflix", "gemini"},
+	}, func() {
+		r := Result{
+			Proxy: map[string]any{"name": "n"},
+			Media: []unlock.Result{
+				{Name: "OpenAI ChatGPT", Status: 3, StatusText: "no"},
+				okResult("Netflix", "us"),
+				{Name: "Google Gemini", Status: -1, StatusText: "network_error"},
+			},
+		}
+		got := RenderName(r, false)
+		want := "n·NF✓(us)"
 		if got != want {
 			t.Errorf("RenderName() = %q, want %q", got, want)
 		}
@@ -71,18 +100,20 @@ func TestRenderName_RenameOff_WithMediaTags(t *testing.T) {
 }
 
 func TestRenderName_PlatformsOrderMatters(t *testing.T) {
-	// 标签顺序严格遵循 config.Platforms
+	// 流媒体摘要顺序遵循 r.Media(即 resolveMediaProviders 按 config.Platforms 展开的顺序)
 	withConfig(t, config.Config{
 		RenameNode: false,
-		Platforms:  []string{"netflix", "openai"}, // 与上一个测试顺序相反
+		Platforms:  []string{"netflix", "openai"},
 	}, func() {
 		r := Result{
-			Proxy:   map[string]any{"name": "n"},
-			Openai:  &platform.OpenAIResult{Full: true, Region: "HK"},
-			Netflix: &platform.NetflixResult{Full: true, Region: "HK"},
+			Proxy: map[string]any{"name": "n"},
+			Media: []unlock.Result{
+				okResult("Netflix", "hk"),
+				okResult("OpenAI ChatGPT", "hk"),
+			},
 		}
 		got := RenderName(r, false)
-		want := "n|NF-HK|GPT⁺-HK"
+		want := "n·NF✓(hk)·GPT✓(hk)"
 		if got != want {
 			t.Errorf("RenderName() = %q, want %q", got, want)
 		}
@@ -100,7 +131,7 @@ func TestRenderName_IncludeSpeedTrue(t *testing.T) {
 			Speed: 5120, // 5.0 MB/s
 		}
 		got := RenderName(r, true)
-		want := "n|5.0MB/s"
+		want := "n·5.0MB/s"
 		if got != want {
 			t.Errorf("RenderName() = %q, want %q", got, want)
 		}
@@ -136,7 +167,7 @@ func TestRenderName_SpeedTagFormat_KB(t *testing.T) {
 			Speed: 512, // < 1024,展示 KB/s
 		}
 		got := RenderName(r, true)
-		want := "n|512KB/s"
+		want := "n·512KB/s"
 		if got != want {
 			t.Errorf("RenderName() = %q, want %q", got, want)
 		}
@@ -163,20 +194,22 @@ func TestRenderName_SpeedZero_NoSpeedTag(t *testing.T) {
 }
 
 func TestRenderName_SpeedBeforeMediaTags(t *testing.T) {
-	// 锁定标签顺序: base | speed | media-tags | sub_tag
+	// 锁定标签顺序: base · speed · risk% · media-tags · IP标注 · sub_tag
 	withConfig(t, config.Config{
 		RenameNode:   false,
 		SpeedTestUrl: "https://example.com/file",
 		Platforms:    []string{"openai", "netflix"},
 	}, func() {
 		r := Result{
-			Proxy:   map[string]any{"name": "n", "sub_tag": "tag"},
-			Speed:   5120, // 5.0MB/s
-			Openai:  &platform.OpenAIResult{Full: true, Region: "HK"},
-			Netflix: &platform.NetflixResult{Full: true, Region: "HK"},
+			Proxy: map[string]any{"name": "n", "sub_tag": "tag"},
+			Speed: 5120, // 5.0MB/s
+			Media: []unlock.Result{
+				okResult("OpenAI ChatGPT", "hk"),
+				okResult("Netflix", "hk"),
+			},
 		}
 		got := RenderName(r, true)
-		want := "n|5.0MB/s|GPT⁺-HK|NF-HK|tag"
+		want := "n·5.0MB/s·GPT✓(hk)·NF✓(hk)·tag"
 		if got != want {
 			t.Errorf("RenderName() = %q, want %q", got, want)
 		}
@@ -189,11 +222,13 @@ func TestRenderName_SubTagAppendedLast(t *testing.T) {
 		Platforms:  []string{"disney"},
 	}, func() {
 		r := Result{
-			Proxy:  map[string]any{"name": "n", "sub_tag": "my-sub"},
-			Disney: &platform.DisneyResult{Unlocked: true},
+			Proxy: map[string]any{"name": "n", "sub_tag": "my-sub"},
+			Media: []unlock.Result{
+				okResult("Disney+", ""),
+			},
 		}
 		got := RenderName(r, false)
-		want := "n|D+|my-sub"
+		want := "n·D+✓·my-sub"
 		if got != want {
 			t.Errorf("RenderName() = %q, want %q", got, want)
 		}
@@ -206,11 +241,40 @@ func TestRenderName_IPRiskTag(t *testing.T) {
 		Platforms:  []string{"iprisk"},
 	}, func() {
 		r := Result{
-			Proxy:  map[string]any{"name": "n"},
-			IPRisk: "5%",
+			Proxy: map[string]any{"name": "n"},
+			IPRisk: &iprisk.Result{
+				RiskScore: 5, RiskPct: "5%", Emoji: "🟢",
+				IPAttr: "住宅", IPSource: "原生",
+			},
 		}
 		got := RenderName(r, false)
-		want := "n|5%"
+		want := "n·5%【🟢 住宅|原生】"
+		if got != want {
+			t.Errorf("RenderName() = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestRenderName_RiskPlusStream(t *testing.T) {
+	// 组装 IP 风险 + 流媒体解锁摘要 + IP 标注,完整复现 IP-Stream-Checker 命名
+	withConfig(t, config.Config{
+		RenameNode: false,
+		Platforms:  []string{"gemini", "netflix", "openai", "iprisk"},
+	}, func() {
+		r := Result{
+			Proxy: map[string]any{"name": "🇭🇰 HK-01"},
+			IPRisk: &iprisk.Result{
+				RiskScore: 61, RiskPct: "61%", Emoji: "🟠",
+				IPAttr: "机房", IPSource: "代理",
+			},
+			Media: []unlock.Result{
+				okResult("Google Gemini", "sg"),
+				okResult("Netflix", "us"),
+				okResult("OpenAI ChatGPT", ""),
+			},
+		}
+		got := RenderName(r, false)
+		want := "🇭🇰 HK-01·61%·GM✓(sg)·NF✓(us)·GPT✓【🟠 机房|代理】"
 		if got != want {
 			t.Errorf("RenderName() = %q, want %q", got, want)
 		}
@@ -243,7 +307,6 @@ func TestRenderName_RenameOnWithCountry(t *testing.T) {
 
 func TestRenderName_RenameOnButEmptyCountry_UsesOtherFallback(t *testing.T) {
 	// 重命名开启但 Country 为空(Phase 2 查询失败),应走 ❓Other 兜底
-	// 而不是回退到原名,否则上游带 |speed|media 尾缀的脏名会透传进来再被叠加。
 	proxyutils.ResetRenameCounter()
 	withConfig(t, config.Config{
 		RenameNode: true,

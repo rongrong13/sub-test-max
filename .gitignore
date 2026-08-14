@@ -13,3 +13,6 @@ mihomo-check*
 .qoder/
 
 .DS_Store
+
+# local go toolchain & build cache
+.toolchain/

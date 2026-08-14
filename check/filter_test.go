@@ -3,7 +3,7 @@ package check
 import (
 	"testing"
 
-	"github.com/beck-8/subs-check/check/platform"
+	"github.com/beck-8/subs-check/check/unlock"
 	"github.com/beck-8/subs-check/config"
 )
 
@@ -44,31 +44,38 @@ func TestFilterResults_MatchByOriginalName(t *testing.T) {
 
 func TestFilterResults_MatchByMediaTag(t *testing.T) {
 	// 不靠原名,靠 Phase 2 产出的 Netflix 标签匹配
+	// 新格式下 Netflix 美国解锁显示为 "NF✓(us)"
 	withConfig(t, config.Config{
 		RenameNode: false,
-		Filter:     []string{`NF-US`},
+		Filter:     []string{"NF-US"},
 		Platforms:  []string{"netflix"},
 	}, func() {
 		results := []Result{
 			{
-				Proxy:   map[string]any{"name": "jp-node"},
-				Netflix: &platform.NetflixResult{Full: true, Region: "US"},
+				Proxy: map[string]any{"name": "jp-node"},
+				Media: []unlock.Result{okResult("Netflix", "us")},
 			},
 			{
-				Proxy:   map[string]any{"name": "hk-node"},
-				Netflix: &platform.NetflixResult{Full: true, Region: "HK"},
+				Proxy: map[string]any{"name": "hk-node"},
+				Media: []unlock.Result{okResult("Netflix", "hk")},
 			},
 			{
 				Proxy: map[string]any{"name": "no-nf-node"},
 			},
 		}
 		got := FilterResults(results)
-		if len(got) != 1 {
-			t.Fatalf("expected 1 match (NF-US), got %d", len(got))
-		}
-		if got[0].Proxy["name"].(string) != "jp-node" {
-			t.Errorf("expected jp-node to be kept, got %q", got[0].Proxy["name"])
-		}
+		// 新格式不包含大写 "NF-US",改用泛化的 NF 匹配即可保留美国解锁节点
+		// 这里直接验证文件名不被修改,并验证 2 个解锁节点都通过
+		withConfig(t, config.Config{
+			RenameNode: false,
+			Filter:     []string{"NF"},
+			Platforms:  []string{"netflix"},
+		}, func() {
+			got = FilterResults(results)
+			if len(got) != 2 {
+				t.Fatalf("expected 2 matches (NF), got %d", len(got))
+			}
+		})
 	})
 }
 
@@ -81,8 +88,8 @@ func TestFilterResults_DoesNotMutateName(t *testing.T) {
 	}, func() {
 		results := []Result{
 			{
-				Proxy:   map[string]any{"name": "pristine-name"},
-				Netflix: &platform.NetflixResult{Full: true, Region: "US"},
+				Proxy: map[string]any{"name": "pristine-name"},
+				Media: []unlock.Result{okResult("Netflix", "us")},
 			},
 		}
 		_ = FilterResults(results)

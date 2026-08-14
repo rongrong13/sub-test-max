@@ -28,7 +28,6 @@
 - **✏️ 节点重命名**
 - **🔄 任意格式订阅转换**
 - **🔔 支持100+通知渠道**
-- **🌐 内置 Sub-Store**
 - **🖥️ WEB 控制面板**
 - **⏰ 支持 Crontab 表达式**
 - **🖥️ 多平台支持**
@@ -112,7 +111,6 @@ services:
       - ./config:/app/config
       - ./output:/app/output
     ports:
-      - "8299:8299"
       - "8199:8199"
     environment:
       - TZ=Asia/Shanghai
@@ -187,56 +185,19 @@ notify-title: "🔔 节点状态更新"
 
 ## 📲 订阅使用方法
 
-> **💡 提示：** 内置 Sub-Store，可生成多种订阅格式；高级玩家可DIY很多功能
+> **💡 提示：** 检测完成后会生成 `all.yaml` 保存到 output 目录，并由 8199 端口提供文件服务。
 
-**🚀 通用订阅**
+**🚀 通用订阅（Clash 格式）**
 ```bash
-# 通用订阅
-http://127.0.0.1:8299/download/sub
-
-# URI 订阅
-http://127.0.0.1:8299/download/sub?target=URI
-
-# Mihomo/ClashMeta
-http://127.0.0.1:8299/download/sub?target=ClashMeta
-
-# Clash
-http://127.0.0.1:8299/download/sub?target=Clash
-
-# V2Ray
-http://127.0.0.1:8299/download/sub?target=V2Ray
-
-# ShadowRocket
-http://127.0.0.1:8299/download/sub?target=ShadowRocket
-
-# Quantumult
-http://127.0.0.1:8299/download/sub?target=QX
-
-# Sing-Box
-http://127.0.0.1:8299/download/sub?target=sing-box
-
-# Surge
-http://127.0.0.1:8299/download/sub?target=Surge
-
-# Surfboard
-http://127.0.0.1:8299/download/sub?target=Surfboard
-```
-
-**🚀 Mihomo/Clash 订阅（带规则）：**
-> 默认使用 `https://raw.githubusercontent.com/beck-8/override-hub/refs/heads/main/yaml/ACL4SSR_Online_Full.yaml` 覆写  
-可在配置中更改 `mihomo-overwrite-url`。
-```bash
-http://127.0.0.1:8299/api/file/mihomo
+http://127.0.0.1:8199/sub/all.yaml
 ```
 
 ## 🌐 内置端口说明
-> subs-check本身会在测试完后保存三个文件到output目录中；output目录中的所有文件会被8199端口提供文件服务
+> 检测完成后会在 output 目录生成 `all.yaml`；output 目录中的所有文件会被 8199 端口提供文件服务。
 
-| 服务地址                        | 格式说明                | 来源说明|
-|-------------------------------|-------------------|----|
-| `http://127.0.0.1:8199/sub/all.yaml`   | Clash 格式节点 |由subs-check直接生成|
-| `http://127.0.0.1:8199/sub/mihomo.yaml`| 带分流规则的 Mihomo/Clash 订阅 |从上方sub-store转换下载后提供|
-| `http://127.0.0.1:8199/sub/base64.txt` | Base64 格式订阅 |从上方sub-store转换下载后提供|
+| 服务地址 | 格式说明 | 来源说明 |
+|---|---|---|
+| `http://127.0.0.1:8199/sub/all.yaml` | Clash 格式节点 | 由本工具直接生成 |
 
 ## 🗺️ 架构图
 <details>
@@ -256,24 +217,16 @@ graph TD
         B4 -->|测速不达标| X[丢弃]
     end
     B5 -->|保存到 output 目录| C[output 目录]
-    B5 -->|上传 all.yaml| D[sub-store]
     C -->|保存到各位置| H1[R2/Gist/WebDAV/S3]
     H1 -->|存储完成| H2[发送消息通知]
-    D -->|提供订阅转换服务| E[sub-store 转换服务]
-    subgraph sub-store 独立功能
-        E -->|生成配置文件| E1[mihomo.yaml, base64.txt]
-        E -->|其他格式转换| E2[Clash, V2Ray, ShadowRocket 等]
-        E -->|订阅分享| E3[分享订阅链接]
-    end
-    E1 -->|保存到 output 目录| C
-    C -->|文件服务| F[8199 端口: /sub]
+    C -->|文件服务| F[8199 端口: /sub/all.yaml]
     B -->|Web 管理| G[8199 端口: /admin]
 ``` 
 
 </details>
 
 ## 🙏 鸣谢
-[beck-8](https://github.com/beck-8)（本项目的基座来自作者的 subs-check）、[cmliu](https://github.com/cmliu)、[Sub-Store](https://github.com/sub-store-org/Sub-Store)、[bestruirui](https://github.com/bestruirui/BestSub)、[1password](https://1password.com/)、[ipinfo.io](https://ipinfo.io/)
+[beck-8](https://github.com/beck-8)（本项目的基座来自作者的 subs-check）、[cmliu](https://github.com/cmliu)、[bestruirui](https://github.com/bestruirui/BestSub)、[1password](https://1password.com/)、[ipinfo.io](https://ipinfo.io/)
 
 ## ⭐ Star History
 

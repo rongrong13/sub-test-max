@@ -1,9 +1,6 @@
 package save
 
 import (
-	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/rongrong13/sub-test-max/check"
@@ -56,109 +53,6 @@ func TestMarshalProxies_SingleResult(t *testing.T) {
 			t.Errorf("yaml should contain %q, got:\n%s", keyword, got)
 		}
 	}
-}
-
-// ---- fetchSubStoreData ----
-
-func TestFetchSubStoreData_Success(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "mihomo-config-content")
-	}))
-	defer ts.Close()
-
-	data := fetchSubStoreData(ts.URL, "mihomo.yaml")
-	if string(data) != "mihomo-config-content" {
-		t.Errorf("expected 'mihomo-config-content', got %q", string(data))
-	}
-}
-
-func TestFetchSubStoreData_Non200(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "not found")
-	}))
-	defer ts.Close()
-
-	data := fetchSubStoreData(ts.URL, "mihomo.yaml")
-	if data != nil {
-		t.Errorf("expected nil for non-200 response, got %q", string(data))
-	}
-}
-
-func TestFetchSubStoreData_ServerError(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "internal error")
-	}))
-	defer ts.Close()
-
-	data := fetchSubStoreData(ts.URL, "base64.txt")
-	if data != nil {
-		t.Errorf("expected nil for 500 response, got %q", string(data))
-	}
-}
-
-func TestFetchSubStoreData_InvalidURL(t *testing.T) {
-	data := fetchSubStoreData("http://127.0.0.1:0/invalid", "test.yaml")
-	if data != nil {
-		t.Errorf("expected nil for connection error, got %q", string(data))
-	}
-}
-
-// ---- saveIfNotEmpty ----
-
-func TestSaveIfNotEmpty_WithData(t *testing.T) {
-	called := false
-	var gotData []byte
-	var gotFilename string
-
-	saver := func(data []byte, filename string) error {
-		called = true
-		gotData = data
-		gotFilename = filename
-		return nil
-	}
-
-	saveIfNotEmpty(saver, []byte("test-data"), "test.yaml")
-
-	if !called {
-		t.Fatal("saver should be called when data is not empty")
-	}
-	if string(gotData) != "test-data" {
-		t.Errorf("expected data 'test-data', got %q", string(gotData))
-	}
-	if gotFilename != "test.yaml" {
-		t.Errorf("expected filename 'test.yaml', got %q", gotFilename)
-	}
-}
-
-func TestSaveIfNotEmpty_EmptyData(t *testing.T) {
-	called := false
-	saver := func(data []byte, filename string) error {
-		called = true
-		return nil
-	}
-
-	saveIfNotEmpty(saver, nil, "test.yaml")
-	if called {
-		t.Fatal("saver should not be called when data is nil")
-	}
-
-	saveIfNotEmpty(saver, []byte{}, "test.yaml")
-	if called {
-		t.Fatal("saver should not be called when data is empty")
-	}
-}
-
-func TestSaveIfNotEmpty_SaverError(t *testing.T) {
-	config.GlobalConfig.SaveMethod = "local"
-	saver := func(data []byte, filename string) error {
-		return fmt.Errorf("disk full")
-	}
-
-	// 不应 panic，错误只记录日志
-	saveIfNotEmpty(saver, []byte("data"), "test.yaml")
 }
 
 // ---- newRemoteSaver ----

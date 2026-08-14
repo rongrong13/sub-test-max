@@ -8,3 +8,6 @@ Dockerfile
 .idea
 .vscode 
 test
+# local go toolchain
+.toolchain/
+output/

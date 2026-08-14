@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"runtime"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
 
 	"github.com/rongrong13/sub-test-max/app/monitor"
-	"github.com/rongrong13/sub-test-max/assets"
 	"github.com/rongrong13/sub-test-max/check"
 	"github.com/rongrong13/sub-test-max/config"
 	"github.com/rongrong13/sub-test-max/save"
@@ -85,15 +83,6 @@ func (app *App) Initialize() error {
 		if err := app.initHttpServer(); err != nil {
 			return fmt.Errorf("初始化HTTP服务器失败: %w", err)
 		}
-	}
-
-	if config.GlobalConfig.SubStorePort != "" {
-		if runtime.GOOS == "linux" && runtime.GOARCH == "386" {
-			slog.Warn("node不支持Linux 32位系统，不启动sub-store服务")
-		}
-		go assets.RunSubStoreService()
-		// 求等吗得，日志会按预期顺序输出
-		time.Sleep(500 * time.Millisecond)
 	}
 
 	// 启动内存监控

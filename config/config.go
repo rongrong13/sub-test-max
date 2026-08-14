@@ -51,11 +51,6 @@ type Config struct {
 	AppriseApiServer     string    `yaml:"apprise-api-server"`
 	RecipientUrl         []string  `yaml:"recipient-url"`
 	NotifyTitle          string    `yaml:"notify-title"`
-	SubStorePort         string    `yaml:"sub-store-port"`
-	SubStorePath         string    `yaml:"sub-store-path"`
-	SubStoreSyncCron     string    `yaml:"sub-store-sync-cron"`
-	SubStorePushService  string    `yaml:"sub-store-push-service"`
-	SubStoreProduceCron  string    `yaml:"sub-store-produce-cron"`
 	MihomoOverwriteUrl   string    `yaml:"mihomo-overwrite-url"`
 	MediaCheck           bool      `yaml:"media-check"`
 	Platforms            []string  `yaml:"platforms"`

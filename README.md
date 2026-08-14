@@ -122,10 +122,6 @@ services:
     restart: always
     network_mode: bridge
 ```
-### 📦 二进制文件运行
-
-下载 [Releases](https://github.com/rongrong13/sub-test-max/releases) 中适合的版本，解压后直接运行即可。
-
 ### 🖥️ 源码运行
 
 ```bash

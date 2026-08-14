@@ -89,7 +89,7 @@ filter:
   # - "Spotify✓"                 # 保留解锁 Spotify 的节点
 
 # 是否开启流媒体检测，其中IP欺诈依赖重命名
-media-check: false
+media-check: true
 # 流媒体检测超时时间(秒)，未设置则默认为10秒
 media-check-timeout: 5
 platforms:

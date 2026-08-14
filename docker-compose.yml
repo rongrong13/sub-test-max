@@ -1,0 +1,15 @@
+services:
+  subs-check:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sub-test-max:latest
+    container_name: sub-test-max
+    restart: unless-stopped
+    ports:
+      - "8199:8199"
+    volumes:
+      - ./config:/app/config
+      - ./output:/app/output
+    environment:
+      - TZ=Asia/Shanghai

@@ -1,0 +1,121 @@
+// Copyright (c) Tailscale Inc & contributors
+// SPDX-License-Identifier: BSD-3-Clause
+
+package tsdial
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/netip"
+	"strconv"
+	"strings"
+
+	"github.com/metacubex/tailscale/types/netmap"
+	"github.com/metacubex/tailscale/util/dnsname"
+)
+
+// dnsMap maps MagicDNS names (both base + FQDN) to their first IP.
+// It must not be mutated once created.
+//
+// Example keys are "foo.domain.tld.beta.tailscale.net" and "foo",
+// both without trailing dots, and both always lowercase.
+type dnsMap map[string]netip.Addr
+
+// canonMapKey canonicalizes its input s to be a dnsMap map key.
+func canonMapKey(s string) string {
+	return strings.ToLower(strings.TrimSuffix(s, "."))
+}
+
+func dnsMapFromNetworkMap(nm *netmap.NetworkMap) dnsMap {
+	if nm == nil {
+		return nil
+	}
+	ret := make(dnsMap)
+	suffix := nm.MagicDNSSuffix()
+	have4 := false
+	addrs := nm.GetAddresses()
+	if name := nm.SelfName(); name != "" && addrs.Len() > 0 {
+		ip := addrs.At(0).Addr()
+		ret[canonMapKey(name)] = ip
+		if dnsname.HasSuffix(name, suffix) {
+			ret[canonMapKey(dnsname.TrimSuffix(name, suffix))] = ip
+		}
+		addrs.All()(func(_ int, p netip.Prefix) bool {
+			if p.Addr().Is4() {
+				have4 = true
+			}
+			return true
+		})
+	}
+	for _, p := range nm.Peers {
+		if p.Name() == "" {
+			continue
+		}
+		p.Addresses().All()(func(_ int, pfx netip.Prefix) bool {
+			ip := pfx.Addr()
+			if ip.Is4() && !have4 {
+				return true
+			}
+			ret[canonMapKey(p.Name())] = ip
+			if dnsname.HasSuffix(p.Name(), suffix) {
+				ret[canonMapKey(dnsname.TrimSuffix(p.Name(), suffix))] = ip
+			}
+			return false
+		})
+	}
+	for _, rec := range nm.DNS.ExtraRecords {
+		if rec.Type != "" {
+			continue
+		}
+		ip, err := netip.ParseAddr(rec.Value)
+		if err != nil {
+			continue
+		}
+		ret[canonMapKey(rec.Name)] = ip
+	}
+	return ret
+}
+
+// errUnresolved is a sentinel error returned by dnsMap.resolveMemory.
+var errUnresolved = errors.New("address well formed but not resolved")
+
+func splitHostPort(addr string) (host string, port uint16, err error) {
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", 0, err
+	}
+	port16, err := strconv.ParseUint(portStr, 10, 16)
+	if err != nil {
+		return "", 0, fmt.Errorf("invalid port in address %q", addr)
+	}
+	return host, uint16(port16), nil
+}
+
+// Resolve resolves addr into an IP:port using first the MagicDNS contents
+// of m, else using the system resolver.
+//
+// The error is [exactly] errUnresolved if the addr is a name that isn't known
+// in the map.
+func (m dnsMap) resolveMemory(ctx context.Context, network, addr string) (_ netip.AddrPort, err error) {
+	host, port, err := splitHostPort(addr)
+	if err != nil {
+		// addr malformed or invalid port.
+		return netip.AddrPort{}, err
+	}
+	if ip, err := netip.ParseAddr(host); err == nil {
+		// addr was literal ip:port.
+		return netip.AddrPortFrom(ip, port), nil
+	}
+
+	// Host is not an IP, so assume it's a DNS name.
+
+	// Try MagicDNS first, otherwise a real DNS lookup.
+	ip := m[canonMapKey(host)]
+	if ip.IsValid() {
+		return netip.AddrPortFrom(ip, port), nil
+	}
+
+	return netip.AddrPort{}, errUnresolved
+}

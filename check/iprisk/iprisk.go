@@ -180,19 +180,48 @@ func Check(mediaClient *http.Client) *Result {
 	if err1 == nil && ip1 != nil {
 		res.IP = ip1.IP
 		res.Country = ip1.CountryCode
-		res.RiskScore = ip1.FraudScore
-		res.RiskPct = fmt.Sprintf("%d%%", ip1.FraudScore)
-		res.Emoji = emojiFor(ip1.FraudScore)
 		if ip1.IsResidential {
 			res.IPAttr = "住宅"
 			res.IPSource = "原生"
 		} else {
 			res.IPAttr = "机房"
 		}
+
+		if ip1.FraudScore > 0 {
+			// 正常分值直接采用
+			res.RiskScore = ip1.FraudScore
+			res.RiskPct = fmt.Sprintf("%d%%", ip1.FraudScore)
+			res.Emoji = emojiFor(ip1.FraudScore)
+		} else {
+			// 0 分不可信: ippure 对 IPv6 出口没有数据(实测全部返回 0),
+			// 机房 IP 的 0 分同样可疑。用 ipok caller 模式(走节点查出口,
+			// 不受第三方 IP 配额限制)交叉验证,取 ipok 的分值。
+			if ip2, err := queryIpokCaller(riskClient); err == nil && ip2 != nil {
+				res.RiskScore = ip2.Risk
+				res.RiskPct = fmt.Sprintf("%d%%", ip2.Risk)
+				res.Emoji = emojiFor(ip2.Risk)
+				if hasAny(ip2.Signals, "hosting") {
+					res.IPAttr = "机房"
+				} else {
+					res.IPAttr = "住宅"
+				}
+				if hasAny(ip2.Signals, "proxy", "vpn", "tor") {
+					res.IPSource = "代理"
+				} else {
+					res.IPSource = "原生"
+				}
+			} else {
+				// 交叉验证失败: 不采信 0 分,标记未知
+				res.RiskScore = -1
+				res.RiskPct = "?"
+				res.Emoji = "❓"
+				res.Error = fmt.Sprintf("ippure 0分不可信且 ipok 交叉验证失败: %v", err)
+			}
+		}
 	}
 
 	// ---- 源2: ipok 兜底(仅当 ippure 失败时) ----
-	if res.RiskScore < 0 {
+	if res.RiskScore < 0 && err1 != nil {
 		ip2, _ := queryIpokCaller(riskClient) // 走节点 caller 模式
 		if ip2 != nil {
 			res.IP = ip2.Geo.IP

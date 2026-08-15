@@ -63,6 +63,7 @@ type Config struct {
 	Proxy                string    `yaml:"proxy"`
 	CallbackScript       string    `yaml:"callback-script"`
 	Filter               []string  `yaml:"filter"`
+	ExcludeFilter        []string  `yaml:"exclude-filter"`
 	KeepDays             int       `yaml:"keep-days"`
 	DNS                  DNSConfig `yaml:"dns"`
 }

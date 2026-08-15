@@ -30,16 +30,44 @@ func CompileFilterPatterns() []*regexp.Regexp {
 	return patterns
 }
 
-// MatchesFilter reports whether r's rendered name (without speed tag)
-// matches any pattern. An empty pattern slice counts as "passes".
-func MatchesFilter(r Result, patterns []*regexp.Regexp) bool {
-	if len(patterns) == 0 {
-		return true
+// CompileExcludePatterns compiles the configured exclude-filter regex list
+// (原版 subs-check 同款: 命中任一排除正则的节点直接丢弃,
+// 未带标签/未命中的节点保留)。
+func CompileExcludePatterns() []*regexp.Regexp {
+	if len(config.GlobalConfig.ExcludeFilter) == 0 {
+		return nil
 	}
+	var patterns []*regexp.Regexp
+	for _, pattern := range config.GlobalConfig.ExcludeFilter {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			slog.Warn(fmt.Sprintf("排除过滤正则表达式编译失败，已跳过: %s, 错误: %v", pattern, err))
+			continue
+		}
+		patterns = append(patterns, re)
+	}
+	return patterns
+}
+
+// MatchesFilter reports whether r's rendered name (without speed tag)
+// passes the include filter AND the exclude filter.
+//   - include: 空 pattern 视为全部通过;否则需匹配任一 pattern
+//   - exclude: 命中任一 exclude 正则即被排除(先排除,再包含)
+func MatchesFilter(r Result, patterns, excludes []*regexp.Regexp) bool {
 	if r.Proxy == nil {
 		return false
 	}
 	name := RenderName(r, false)
+	// 排除规则优先: 命中任一排除正则 → 丢弃
+	for _, re := range excludes {
+		if re.MatchString(name) {
+			return false
+		}
+	}
+	// 包含规则: 空列表视为全部通过
+	if len(patterns) == 0 {
+		return true
+	}
 	for _, re := range patterns {
 		if re.MatchString(name) {
 			return true
@@ -55,15 +83,16 @@ func MatchesFilter(r Result, patterns []*regexp.Regexp) bool {
 // 国家+媒体标签的完整视图,同时保持 proxy["name"] 不被修改。
 func FilterResults(results []Result) []Result {
 	patterns := CompileFilterPatterns()
-	if len(patterns) == 0 {
+	excludes := CompileExcludePatterns()
+	if len(patterns) == 0 && len(excludes) == 0 {
 		return results
 	}
 
-	slog.Info(fmt.Sprintf("应用节点过滤规则，共 %d 个正则表达式", len(patterns)))
+	slog.Info(fmt.Sprintf("应用节点过滤规则，保留规则 %d 条, 排除规则 %d 条", len(patterns), len(excludes)))
 
 	var filtered []Result
 	for _, r := range results {
-		if MatchesFilter(r, patterns) {
+		if MatchesFilter(r, patterns, excludes) {
 			filtered = append(filtered, r)
 		}
 	}

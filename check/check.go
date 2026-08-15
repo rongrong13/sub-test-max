@@ -2,6 +2,7 @@ package check
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"math"
@@ -10,20 +11,19 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"crypto/tls"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/juju/ratelimit"
+	"github.com/metacubex/mihomo/adapter"
+	"github.com/metacubex/mihomo/constant"
 	"github.com/rongrong13/sub-test-max/check/iprisk"
 	"github.com/rongrong13/sub-test-max/check/platform"
 	"github.com/rongrong13/sub-test-max/check/unlock"
 	"github.com/rongrong13/sub-test-max/config"
 	proxyutils "github.com/rongrong13/sub-test-max/proxy"
-	"github.com/juju/ratelimit"
-	"github.com/metacubex/mihomo/adapter"
-	"github.com/metacubex/mihomo/constant"
 )
 
 // Result 存储节点检测结果
@@ -233,8 +233,9 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 
 	// Compile filter patterns once; media workers re-use the slice.
 	patterns := CompileFilterPatterns()
-	if len(patterns) > 0 {
-		slog.Info(fmt.Sprintf("应用节点过滤规则，共 %d 个正则表达式", len(patterns)))
+	excludePatterns := CompileExcludePatterns()
+	if len(patterns) > 0 || len(excludePatterns) > 0 {
+		slog.Info(fmt.Sprintf("应用节点过滤规则，保留 %d 条, 排除 %d 条", len(patterns), len(excludePatterns)))
 	}
 
 	// Whole-pipeline cancellation: collector pulls the trigger on SuccessLimit,
@@ -260,7 +261,7 @@ func (pc *ProxyChecker) run(proxies []map[string]any) ([]Result, error) {
 	go func() { aliveWg.Wait(); close(mediaIn) }()
 
 	// Media workers (filter runs inline on each passing item)
-	mediaWg := pc.startMediaWorkers(ctx, mediaConcurrency, mediaIn, speedIn, collectIn, hasSpeedTest, patterns)
+	mediaWg := pc.startMediaWorkers(ctx, mediaConcurrency, mediaIn, speedIn, collectIn, hasSpeedTest, patterns, excludePatterns)
 	go func() {
 		mediaWg.Wait()
 		close(speedIn)
@@ -448,7 +449,7 @@ func (pc *ProxyChecker) startMediaWorkers(
 	in <-chan mediaEntry,
 	speedOut, collectOut chan<- pipelineItem,
 	hasSpeed bool,
-	patterns []*regexp.Regexp,
+	patterns, excludePatterns []*regexp.Regexp,
 ) *sync.WaitGroup {
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
@@ -461,7 +462,7 @@ func (pc *ProxyChecker) startMediaWorkers(
 				}
 				res := pc.checkMedia(entry.a)
 				MediaDone.Add(1)
-				if res == nil || !MatchesFilter(*res, patterns) {
+				if res == nil || !MatchesFilter(*res, patterns, excludePatterns) {
 					continue
 				}
 				FilterPassed.Add(1)

@@ -133,9 +133,10 @@ func RenderName(r Result, includeSpeed bool) string {
 	}
 
 	// 3. 风险度百分比(仅当有 IP 风险结果且非失败)
+	// 用 | 前缀与旧版 filter 正则(如 \\|[0-9]% )保持兼容
 	var riskPct string
 	if r.IPRisk != nil && r.IPRisk.RiskPct != "" && r.IPRisk.RiskPct != "?" {
-		riskPct = r.IPRisk.RiskPct
+		riskPct = "|" + r.IPRisk.RiskPct
 	}
 
 	// 4. 流媒体解锁摘要(只显示解锁成功的服务)

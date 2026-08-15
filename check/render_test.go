@@ -248,7 +248,7 @@ func TestRenderName_IPRiskTag(t *testing.T) {
 			},
 		}
 		got := RenderName(r, false)
-		want := "n·5%【🟢 住宅|原生】"
+		want := "n·|5%【🟢 住宅|原生】"
 		if got != want {
 			t.Errorf("RenderName() = %q, want %q", got, want)
 		}
@@ -274,7 +274,7 @@ func TestRenderName_RiskPlusStream(t *testing.T) {
 			},
 		}
 		got := RenderName(r, false)
-		want := "🇭🇰 HK-01·61%·GM✓(sg)·NF✓(us)·GPT✓【🟠 机房|代理】"
+		want := "🇭🇰 HK-01·|61%·GM✓(sg)·NF✓(us)·GPT✓【🟠 机房|代理】"
 		if got != want {
 			t.Errorf("RenderName() = %q, want %q", got, want)
 		}

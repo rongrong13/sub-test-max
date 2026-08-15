@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/metacubex/mihomo/constant"
 )
@@ -127,7 +128,9 @@ func (b *socks5Bridge) handle(conn net.Conn) {
 	target := net.JoinHostPort(host, strconv.Itoa(int(port)))
 
 	// 3. 用 mihomo 节点拨号
-	ctx, cancel := context.WithCancel(context.Background())
+	// 拨号必须带超时: 死节点/半死节点的 TCP 连接可能一直挂起,
+	// 若不限制会让整轮媒体检测的尾部卡住,迟迟不写出结果。
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	upstream, err := b.dialNode(ctx, "tcp", target)
 	if err != nil {

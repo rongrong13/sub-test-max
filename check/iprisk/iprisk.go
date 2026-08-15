@@ -172,11 +172,21 @@ func hasAny(signals []string, keys ...string) bool {
 //
 // 任一源成功即有风控值;两个都失败才返回未知(❓),此时节点无风控标签,
 // 不会被风险过滤误杀也不会被保留(与"测不出"语义一致)。
+//
+// 注意: 入参 mediaClient 的超时较短(media-check-timeout,默认5s),慢节点上
+// 一次 ippure 往返经常不够,因此这里基于同一传输层另建一个 15s 超时的客户端,
+// 风控查询不受媒体检测超时限制。
 func Check(mediaClient *http.Client) *Result {
 	res := &Result{RiskScore: -1, RiskPct: "?", Emoji: "❓", IPAttr: "未知", IPSource: "未知"}
 
+	// 独立超时: 沿用节点传输层,但给风控查询 15s(慢节点 5s 不够)
+	riskClient := &http.Client{
+		Transport: mediaClient.Transport,
+		Timeout:   15 * time.Second,
+	}
+
 	// ---- 源1: ippure(走节点) ----
-	ip1, err1 := queryIppure(mediaClient)
+	ip1, err1 := queryIppure(riskClient)
 	if err1 == nil && ip1 != nil {
 		res.IP = ip1.IP
 		res.Country = ip1.CountryCode
@@ -196,7 +206,7 @@ func Check(mediaClient *http.Client) *Result {
 	if res.IP != "" {
 		ip2, _ = queryIpokByIP(res.IP) // 直连指定 IP,不经节点
 	} else {
-		ip2, _ = queryIpokCaller(mediaClient) // 走节点 caller 模式
+		ip2, _ = queryIpokCaller(riskClient) // 走节点 caller 模式
 	}
 	if ip2 != nil {
 		if res.RiskScore < 0 { // ippure 失败,用 ipok 的风控值顶上

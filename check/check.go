@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"crypto/tls"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -766,6 +767,9 @@ func CreateClient(mapping map[string]any) *ProxyClient {
 
 	var bytesRead uint64
 	baseTransport := &http.Transport{
+		// 跳过证书验证: 大量免费节点对 HTTPS 做 TLS 中间人(自签证书),
+		// 不跳过则 iprisk/国家查询等 HTTPS 检测全部 x509 失败。
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			host, port, err := net.SplitHostPort(addr)
 			if err != nil {

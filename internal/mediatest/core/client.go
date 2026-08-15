@@ -35,6 +35,9 @@ func buildClientOptions(disableIPv4, disableIPv6 bool) []tls_client.HttpClientOp
 	options := []tls_client.HttpClientOption{
 		tls_client.WithTimeoutSeconds(30),
 		tls_client.WithClientProfile(profiles.Chrome_146),
+		// 跳过证书验证: 大量免费节点会做 TLS 中间人(自签证书),
+		// 不跳过则这些节点的流媒体/风控检测全部 x509 失败。
+		tls_client.WithInsecureSkipVerify(),
 		tls_client.WithCustomRedirectFunc(func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		}),

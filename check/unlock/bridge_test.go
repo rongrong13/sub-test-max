@@ -1,12 +1,10 @@
 package unlock
 
 import (
-	"bufio"
 	"context"
-	"fmt"
+	"encoding/binary"
 	"io"
 	"net"
-	"strings"
 	"testing"
 )
 
@@ -32,14 +30,14 @@ func startEchoServer(t *testing.T) (addr string, close func()) {
 	return ln.Addr().String(), func() { ln.Close() }
 }
 
-// TestBridgeConnectRelay 验证本地 CONNECT 代理能把隧道流量正确转发到上游节点。
-// 这里用 echo server 模拟节点输出的目标服务:客户端经桥发出 CONNECT 后,
-// 写入的数据应被 echo 原样回传。
-func TestBridgeConnectRelay(t *testing.T) {
+// TestBridgeSocks5Relay 验证本地 SOCKS5 桥能把隧道流量正确转发到上游节点。
+// 客户端以域名形式发起 CONNECT(dialNode 固定转发到 echo server),
+// 验证 SOCKS5 域名解析路径与双向透传。
+func TestBridgeSocks5Relay(t *testing.T) {
 	echoAddr, closeEcho := startEchoServer(t)
 	defer closeEcho()
 
-	b := &httpConnectProxy{
+	b := &socks5Bridge{
 		dialNode: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return net.Dial("tcp", echoAddr)
 		},
@@ -59,37 +57,46 @@ func TestBridgeConnectRelay(t *testing.T) {
 	}
 	defer client.Close()
 
-	// 发送 CONNECT 到 echo server(目标地址无需真实可拨,因为我们用 dialNode 固定转发)
-	if _, err := fmt.Fprintf(client, "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n"); err != nil {
+	// 1. 握手: 05 01 00 -> 05 00
+	if _, err := client.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		t.Fatal(err)
+	}
+	reply := make([]byte, 2)
+	if _, err := io.ReadFull(client, reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply[0] != 0x05 || reply[1] != 0x00 {
+		t.Fatalf("handshake failed: %v", reply)
+	}
+
+	// 2. CONNECT 域名 example.com:443(dialNode 固定转发到 echo server)
+	host := "example.com"
+	port := 443
+	req := []byte{0x05, 0x01, 0x00, 0x03, byte(len(host))}
+	req = append(req, []byte(host)...)
+	pb := make([]byte, 2)
+	binary.BigEndian.PutUint16(pb, uint16(port))
+	req = append(req, pb...)
+	if _, err := client.Write(req); err != nil {
 		t.Fatal(err)
 	}
 
-	br := bufio.NewReader(client)
-	status, err := br.ReadString('\n')
-	if err != nil {
+	// 3. 期待成功应答: 05 00 00 01 0.0.0.0:0
+	succ := make([]byte, 10)
+	if _, err := io.ReadFull(client, succ); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(status, "200") {
-		t.Fatalf("expected 200 Connection Established, got %q", status)
-	}
-	// 消费剩余响应头
-	for {
-		line, err := br.ReadString('\n')
-		if err != nil {
-			t.Fatal(err)
-		}
-		if line == "\r\n" || line == "\n" {
-			break
-		}
+	if succ[0] != 0x05 || succ[1] != 0x00 {
+		t.Fatalf("connect failed: %v", succ)
 	}
 
-	// 通过隧道发送数据,应原样回传
-	payload := "hello-via-bridge"
+	// 4. 通过隧道发送数据,应原样回传
+	payload := "hello-via-socks5-bridge"
 	if _, err := client.Write([]byte(payload)); err != nil {
 		t.Fatal(err)
 	}
 	buf := make([]byte, len(payload))
-	if _, err := io.ReadFull(br, buf); err != nil {
+	if _, err := io.ReadFull(client, buf); err != nil {
 		t.Fatal(err)
 	}
 	if string(buf) != payload {

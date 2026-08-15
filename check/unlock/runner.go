@@ -4,9 +4,9 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/metacubex/mihomo/constant"
 	"github.com/rongrong13/sub-test-max/internal/mediatest/core"
 	"github.com/rongrong13/sub-test-max/internal/mediatest/providers"
-	"github.com/metacubex/mihomo/constant"
 )
 
 // providerRegistry 把 mediatest 所有区域测试表按服务名平铺成一个 map,
@@ -109,21 +109,23 @@ func toResult(name string, r core.Result) Result {
 
 var clientMu sync.Mutex
 
-// newBridgedClient 为该节点起一个本地 CONNECT 桥,并返回一个走该桥的
-// tls_client 客户端。并发环境下 core 的 HTTPProxy 是包级全局,因此创建
+// newBridgedClient 为该节点起一个本地 SOCKS5 桥,并返回一个走该桥的
+// tls_client 客户端。并发环境下 core 的 SocksProxy 是包级全局,因此创建
 // 客户端时用互斥锁保护"写全局 + 创建"两步;客户端创建后即常驻自己的代理
 // 配置,互不干扰。
-func newBridgedClient(proxy constant.Proxy) (*httpConnectProxy, core.HttpClient, error) {
+func newBridgedClient(proxy constant.Proxy) (*socks5Bridge, core.HttpClient, error) {
 	bridge, err := newBridge(proxy)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	clientMu.Lock()
-	core.SocksProxy = ""
-	core.HTTPProxy = "http://" + bridge.addr()
-	client := core.NewHttpClient(0)
+	// 用 socks5:// 而非 http://: SOCKS5 会把目标域名原样交给节点解析,
+	// 绕开容器内 DNS,兼容软路由/OpenClash 直连环境。
 	core.HTTPProxy = ""
+	core.SocksProxy = "socks5://" + bridge.addr()
+	client := core.NewHttpClient(0)
+	core.SocksProxy = ""
 	clientMu.Unlock()
 
 	return bridge, client, nil

@@ -17,6 +17,8 @@ var GlobeTests = []TestItem{
 	{"Bing", Bing, true},
 	{"Dazn", Dazn, false},
 	{"Disney+", DisneyPlus, true},
+	{"Facebook", Facebook, true},
+	{"Instagram", Instagram, true},
 	{"Google Play Store", GooglePlayStore, true},
 	{"iQiYi", IQiYi, false},
 	{"Netflix", NetflixRegion, true},

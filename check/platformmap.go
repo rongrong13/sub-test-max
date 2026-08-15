@@ -13,8 +13,12 @@ var platformProviderMap = map[string]string{
 	"disney":  "Disney+",
 	"gemini":  "Google Gemini",
 	"claude":  "Anthropic Claude",
-	"spotify": "Spotify Registration",
-	"tiktok":  "TikTok",
+	"spotify":   "Spotify Registration",
+	"tiktok":    "TikTok",
+	"reddit":    "Reddit",
+	"x":         "X (formerly Twitter)",
+	"instagram": "Instagram",
+	"facebook":  "Facebook",
 }
 
 // resolvePlatformKey 返回给定 platform 配置项对应的解析结果:

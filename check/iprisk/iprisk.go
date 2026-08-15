@@ -136,16 +136,6 @@ func doIpokReq(req *http.Request, client *http.Client) (*ipokResp, error) {
 	return parseIpok(body, resp.StatusCode)
 }
 
-// queryIpokByIP 直连查询指定 IP(不经节点)。
-func queryIpokByIP(ip string) (*ipokResp, error) {
-	client := &http.Client{Timeout: 12 * time.Second}
-	req, err := http.NewRequest("GET", "https://ipok.io/api/ip?lang=zh-CN&ip="+ip, nil)
-	if err != nil {
-		return nil, err
-	}
-	return doIpokReq(req, client)
-}
-
 // queryIpokCaller 走节点查询(调用方 IP 即节点出口 IP)。
 func queryIpokCaller(c *http.Client) (*ipokResp, error) {
 	req, err := http.NewRequest("GET", "https://ipok.io/api/ip?lang=zh-CN", nil)
@@ -166,15 +156,15 @@ func hasAny(signals []string, keys ...string) bool {
 	return false
 }
 
-// Check 通过节点出口做双源风控检测(ippure + ipok 互为备选):
-//  1. ippure 走节点 → fraudScore 风控值 + 出口 IP + 国家 + 是否住宅(快)
-//  2. ipok: 源1成功则直连 ?ip=出口IP 聚合六源风控; 源1失败则走节点 caller 模式
+// Check 通过节点出口做双源风控检测(ippure 为主,ipok 兜底):
+//  1. 主源 ippure 走节点 → fraudScore 风控值 + 出口 IP + 国家 + 是否住宅(免费无key)
+//  2. 仅当 ippure 失败时,用 ipok 走节点 caller 模式兜底(聚合六源风控)
 //
-// 任一源成功即有风控值;两个都失败才返回未知(❓),此时节点无风控标签,
-// 不会被风险过滤误杀也不会被保留(与"测不出"语义一致)。
+// 注意: ipok 不作为常规路径——软路由实测每个节点都等 ipok 直连(慢/限流)
+// 会把流水线拖垮,导致风控查询集体超时。ipok 只当 ippure 挂掉时才调用。
 //
-// 注意: 入参 mediaClient 的超时较短(media-check-timeout,默认5s),慢节点上
-// 一次 ippure 往返经常不够,因此这里基于同一传输层另建一个 15s 超时的客户端,
+// 入参 mediaClient 的超时较短(media-check-timeout,默认5s),慢节点上一次
+// ippure 往返经常不够,因此这里基于同一传输层另建一个 15s 超时的客户端,
 // 风控查询不受媒体检测超时限制。
 func Check(mediaClient *http.Client) *Result {
 	res := &Result{RiskScore: -1, RiskPct: "?", Emoji: "❓", IPAttr: "未知", IPSource: "未知"}
@@ -201,36 +191,27 @@ func Check(mediaClient *http.Client) *Result {
 		}
 	}
 
-	// ---- 源2: ipok(互为备选 + 补充代理/原生信号) ----
-	var ip2 *ipokResp
-	if res.IP != "" {
-		ip2, _ = queryIpokByIP(res.IP) // 直连指定 IP,不经节点
-	} else {
-		ip2, _ = queryIpokCaller(riskClient) // 走节点 caller 模式
-	}
-	if ip2 != nil {
-		if res.RiskScore < 0 { // ippure 失败,用 ipok 的风控值顶上
+	// ---- 源2: ipok 兜底(仅当 ippure 失败时) ----
+	if res.RiskScore < 0 {
+		ip2, _ := queryIpokCaller(riskClient) // 走节点 caller 模式
+		if ip2 != nil {
+			res.IP = ip2.Geo.IP
+			res.Country = ip2.Geo.CountryCode
 			res.RiskScore = ip2.Risk
 			res.RiskPct = fmt.Sprintf("%d%%", ip2.Risk)
 			res.Emoji = emojiFor(ip2.Risk)
-		}
-		if res.IP == "" {
-			res.IP = ip2.Geo.IP
-		}
-		if res.Country == "" {
-			res.Country = ip2.Geo.CountryCode
-		}
-		// 属性: 命中 hosting 信号 → 机房,否则住宅
-		if hasAny(ip2.Signals, "hosting") {
-			res.IPAttr = "机房"
-		} else if res.IPAttr == "未知" {
-			res.IPAttr = "住宅"
-		}
-		// 来源: 命中 proxy/vpn/tor 信号 → 代理,否则原生
-		if hasAny(ip2.Signals, "proxy", "vpn", "tor") {
-			res.IPSource = "代理"
-		} else if res.IPSource == "未知" {
-			res.IPSource = "原生"
+			// 属性: 命中 hosting 信号 → 机房,否则住宅
+			if hasAny(ip2.Signals, "hosting") {
+				res.IPAttr = "机房"
+			} else {
+				res.IPAttr = "住宅"
+			}
+			// 来源: 命中 proxy/vpn/tor 信号 → 代理,否则原生
+			if hasAny(ip2.Signals, "proxy", "vpn", "tor") {
+				res.IPSource = "代理"
+			} else {
+				res.IPSource = "原生"
+			}
 		}
 	}
 

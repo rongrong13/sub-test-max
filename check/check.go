@@ -606,6 +606,9 @@ func (pc *ProxyChecker) checkMedia(a aliveResult) *Result {
 				if risk != nil && risk.Country != "" {
 					res.Country = risk.Country
 				}
+				if risk != nil && risk.RiskScore < 0 {
+					slog.Warn("IP风险检测失败(节点无风控标签)", "node", a.Proxy["name"], "err", risk.Error)
+				}
 			}()
 		}
 		if len(providers) > 0 {

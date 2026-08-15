@@ -6,10 +6,10 @@ import (
 	"github.com/rongrong13/sub-test-max/internal/mediatest/core"
 )
 
-// Instagram 检测节点能否正常访问 Instagram。
-// 200/301/302 = 可访问(登录页/首页); 403/429 = 被封锁或风控; 其它 = 意外。
-func Instagram(c core.HttpClient) core.Result {
-	resp, err := core.GET(c, "https://www.instagram.com/")
+// Facebook 检测节点能否正常访问 Facebook。
+// 200/301/302 = 可访问; 403 = 区域封锁; 429 = 限流; 其它 = 意外。
+func Facebook(c core.HttpClient) core.Result {
+	resp, err := core.GET(c, "https://www.facebook.com/")
 	if err != nil {
 		return core.Result{Status: core.StatusNetworkErr, Err: err}
 	}
